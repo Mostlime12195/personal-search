@@ -30,7 +30,7 @@ const wikiLang = computed(() => {
   return langMap[searchParams.value.search_lang] || 'en'
 })
 
-// Fetch data based on search type - runs in parallel with Wikipedia search
+// Fetch data based on search type
 const { data, pending, error, refresh } = await useFetch(() => {
   const type = searchType.value
   const endpoint = type === 'web' ? '/api/search' : `/api/${type}`
@@ -49,7 +49,7 @@ const { data, pending, error, refresh } = await useFetch(() => {
   server: false
 })
 
-// Wikipedia details via server API to bypass CORS
+// Wikipedia details
 const { data: wikiData } = await useFetch(() => {
   if (!searchQuery.value.trim()) return null
   return `/api/wiki?q=${encodeURIComponent(searchQuery.value)}&lang=${wikiLang.value}`
@@ -59,11 +59,9 @@ const { data: wikiData } = await useFetch(() => {
   server: false
 })
 
-const wikipediaResult = computed(() => {
-  return wikiData.value
-})
+const wikipediaResult = computed(() => wikiData.value)
 
-// Compute results based on response structure
+// Compute results
 const allResults = ref([])
 const currentOffset = ref(0)
 const isLoadingMore = ref(false)
@@ -73,7 +71,6 @@ const hasMoreResults = ref(true)
 const loadMoreResults = async () => {
   if (isLoadingMore.value || !hasMoreResults.value || !searchQuery.value.trim()) return
   
-  // Offset must be less than 10, increment by 1
   const nextOffset = currentOffset.value + 1
   if (nextOffset >= 10) {
     hasMoreResults.value = false
@@ -123,14 +120,14 @@ const loadMoreResults = async () => {
   }
 }
 
-// Watch for new searches to reset
+// Watch for new searches
 watch([searchQuery, searchType], () => {
   allResults.value = []
   currentOffset.value = 0
   hasMoreResults.value = true
 })
 
-// Update allResults when initial data changes
+// Update results when initial data changes
 watch(data, (newData) => {
   if (newData) {
     const type = searchType.value
@@ -153,21 +150,19 @@ watch(data, (newData) => {
 const results = computed(() => allResults.value)
 const totalResults = computed(() => results.value.length)
 
-// Scroll handler - for web, video, and news (images don't support offset)
+// Scroll handler
 const handleScroll = () => {
-  if (searchType.value === 'images') return // images don't support offset
+  if (searchType.value === 'images') return
   
   const scrollTop = window.scrollY
   const windowHeight = window.innerHeight
   const documentHeight = document.documentElement.scrollHeight
   
-  // Load more when user is 200px from bottom
   if (scrollTop + windowHeight >= documentHeight - 200) {
     loadMoreResults()
   }
 }
 
-// Set up scroll listener
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
 })
@@ -210,7 +205,7 @@ const applyParams = () => {
 // Settings panel state
 const showSettings = ref(false)
 
-// For local search input
+// Local search input
 const localQuery = ref('')
 const showSuggestions = ref(false)
 const suggestions = ref([])
@@ -317,10 +312,12 @@ const countOptions = [
         <div class="search-bar-wrapper">
           <div class="search-bar">
             <div :class="['search-input-wrapper', { 'has-suggestions': showSuggestions && suggestions.length > 0 }]">
-              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="M21 21l-4.35-4.35"/>
-              </svg>
+              <button @click="handleSearch" class="icon-btn" aria-label="Search">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="M21 21l-4.35-4.35"/>
+                </svg>
+              </button>
               <input 
                 v-model="localQuery"
                 @input="handleInput"
@@ -331,7 +328,7 @@ const countOptions = [
                 class="search-input"
                 placeholder="Search..."
               />
-              <button v-if="localQuery" @click="localQuery = ''" class="clear-btn">
+              <button v-if="localQuery" @click="localQuery = ''" class="clear-btn" aria-label="Clear">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M18 6L6 18M6 6l12 12"/>
                 </svg>
@@ -371,7 +368,7 @@ const countOptions = [
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
             </svg>
-            All
+            <span>All</span>
           </button>
           <button 
             :class="['tab', searchType === 'images' ? 'active' : '']"
@@ -380,7 +377,7 @@ const countOptions = [
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
             </svg>
-            Images
+            <span>Images</span>
           </button>
           <button 
             :class="['tab', searchType === 'videos' ? 'active' : '']"
@@ -389,7 +386,7 @@ const countOptions = [
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
             </svg>
-            Videos
+            <span>Videos</span>
           </button>
           <button 
             :class="['tab', searchType === 'news' ? 'active' : '']"
@@ -398,15 +395,14 @@ const countOptions = [
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
             </svg>
-            News
+            <span>News</span>
           </button>
           
-          <!-- Tools button next to categories with larger spacing -->
           <button 
             :class="['tab tools-tab', showSettings ? 'active' : '']"
             @click="showSettings = !showSettings"
           >
-            Tools
+            <span>Tools</span>
           </button>
         </div>
       </div>
@@ -479,21 +475,20 @@ const countOptions = [
             
             <!-- Web Results -->
             <template v-if="searchType === 'web'">
-              <div 
+              <a 
                 v-for="(result, index) in results" 
                 :key="index" 
+                :href="result.url"
                 class="result-item"
               >
-              <a :href="result.url" class="result-link">
-                  <div class="result-source">
-                    <img v-if="result.profile?.img" :src="result.profile.img" class="favicon" />
-                    <span class="source-name">{{ result.profile?.name || result.url }}</span>
-                  </div>
-                  <h3 class="result-title" v-html="result.title"></h3>
-                </a>
+                <div class="result-source">
+                  <img v-if="result.profile?.img" :src="result.profile.img" class="favicon" />
+                  <span class="source-name">{{ result.profile?.name || result.url }}</span>
+                </div>
+                <h3 class="result-title" v-html="result.title"></h3>
                 <p class="result-url">{{ result.url }}</p>
                 <p class="result-snippet" v-html="result.description"></p>
-              </div>
+              </a>
             </template>
             
             <!-- Image Results -->
@@ -532,21 +527,20 @@ const countOptions = [
             
             <!-- News Results -->
             <template v-else-if="searchType === 'news'">
-              <div 
+              <a 
                 v-for="(result, index) in results" 
                 :key="index" 
+                :href="result.url"
                 class="news-result"
               >
-              <a :href="result.url" class="result-link">
-                  <div class="news-source">
-                    <img v-if="result.profile?.img" :src="result.profile.img" class="favicon" />
-                    <span class="source-name">{{ result.profile?.name }}</span>
-                    <span class="news-date">{{ result.age }}</span>
-                  </div>
-                  <h3 class="result-title" v-html="result.title"></h3>
-                  <p class="result-snippet" v-html="result.description"></p>
-                </a>
-              </div>
+                <div class="news-source">
+                  <img v-if="result.profile?.img" :src="result.profile.img" class="favicon" />
+                  <span class="source-name">{{ result.profile?.name }}</span>
+                  <span class="news-date">{{ result.age }}</span>
+                </div>
+                <h3 class="result-title" v-html="result.title"></h3>
+                <p class="result-snippet" v-html="result.description"></p>
+              </a>
             </template>
           </div>
           
@@ -567,11 +561,9 @@ const countOptions = [
           </div>
         </div>
         
-        <!-- Right Side: Wikipedia sidebar - only show for web search -->
+        <!-- Right Side: Wikipedia sidebar -->
         <div v-if="searchType === 'web'" class="sidebar-section">
-          <!-- Wikipedia knowledge panel -->
           <div v-if="wikipediaResult" class="knowledge-panel">
-            <!-- Featured Image -->
             <img 
               v-if="wikipediaResult.thumbnail?.source" 
               :src="wikipediaResult.thumbnail.source" 
@@ -594,12 +586,13 @@ const countOptions = [
 <style scoped>
 .search-page {
   min-height: 100vh;
-  background: #fff;
+  background: var(--bg-body);
 }
 
+/* Header */
 .search-header {
-  background: #fff;
-  border-bottom: 1px solid #ebebeb;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -608,20 +601,22 @@ const countOptions = [
 .header-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 20px 12px;
+  padding: var(--space-md) var(--space-md) var(--space-sm);
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: var(--space-lg);
 }
 
 .logo-link {
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .logo-text {
-  font-size: 24px;
-  color: #5c220c;
-  font-family: 'Merriweather', Georgia, serif;
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  font-family: var(--font-primary);
+  font-weight: 400;
 }
 
 .search-bar-wrapper {
@@ -632,57 +627,82 @@ const countOptions = [
 
 .search-bar {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .search-input-wrapper {
   flex: 1;
   display: flex;
   align-items: center;
-  background: #fff;
-  border: 1px solid #dfe1e5;
-  border-radius: 24px;
-  padding: 0 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-md);
   height: 44px;
-  box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
 }
 
 .search-input-wrapper:focus-within {
-  box-shadow: 0 1px 6px rgba(32,33,36,0.28);
-  border-color: transparent;
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
 }
 
 .search-input-wrapper.has-suggestions {
-  border-radius: 24px 24px 0 0;
+  border-radius: 22px 22px 0 0;
 }
 
 .search-icon {
   width: 18px;
   height: 18px;
-  color: #9aa0a6;
+  color: var(--text-muted);
   flex-shrink: 0;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.icon-btn:hover {
+  color: var(--color-primary);
 }
 
 .search-input {
   flex: 1;
   border: none;
   outline: none;
-  font-size: 16px;
-  padding: 0 10px;
+  font-size: 1rem;
+  padding: 0 var(--space-sm);
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .clear-btn {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px;
+  padding: var(--space-xs);
   display: flex;
+  color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.clear-btn:hover {
+  color: var(--color-primary);
 }
 
 .clear-btn svg {
-  width: 18px;
-  height: 18px;
-  color: #5f6368;
+  width: 16px;
+  height: 16px;
 }
 
 /* Suggestions Dropdown */
@@ -691,10 +711,11 @@ const countOptions = [
   top: 100%;
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid #dfe1e5;
-  border-radius: 0 0 24px 24px;
-  box-shadow: 0 4px 6px rgba(32,33,36,0.28);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 22px 22px;
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   overflow: hidden;
 }
@@ -708,43 +729,45 @@ const countOptions = [
 .suggestion-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--transition-fast);
+  color: var(--text-primary);
 }
 
 .suggestion-item:hover {
-  background: #f1f3f4;
+  background: var(--bg-elevated);
 }
 
 .suggestion-icon {
   width: 18px;
   height: 18px;
-  color: #5f6368;
-  margin-right: 12px;
+  color: var(--text-muted);
+  margin-right: var(--space-sm);
   flex-shrink: 0;
 }
 
 .suggestion-item span {
-  font-size: 16px;
-  color: #202124;
+  font-size: 1rem;
 }
 
+/* Navigation Tabs */
 .nav-tabs {
-  border-bottom: 1px solid #ebebeb;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tabs-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 var(--space-md);
   display: flex;
   align-items: center;
 }
 
 .tabs-left {
   display: flex;
-  gap: 16px;
+  gap: var(--space-xs);
   align-items: center;
 }
 
@@ -752,23 +775,23 @@ const countOptions = [
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 12px;
+  padding: var(--space-sm) var(--space-md);
   background: none;
   border: none;
-  border-bottom: 3px solid transparent;
-  color: #5f6368;
-  font-size: 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .tab:hover {
-  color: #202124;
+  color: var(--text-primary);
 }
 
 .tab.active {
-  color: #5c220c;
-  border-bottom-color: #5c220c;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .tab svg {
@@ -776,16 +799,15 @@ const countOptions = [
   height: 16px;
 }
 
-/* Tools button styling */
 .tools-tab {
-  margin-left: 8px;
+  margin-left: var(--space-sm);
 }
 
 /* Tools Dropdown */
 .tools-dropdown {
-  background: #fff;
-  border-bottom: 1px solid #ebebeb;
-  padding: 16px 20px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-md);
 }
 
 .tools-section {
@@ -794,68 +816,56 @@ const countOptions = [
 }
 
 .tools-title {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: #5f6368;
-  margin: 0 0 12px 0;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-sm) 0;
 }
 
 .tools-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--space-md);
 }
 
 .tool-group {
-  min-width: 150px;
+  min-width: 140px;
 }
 
 .tool-label {
   display: block;
-  font-size: 12px;
-  color: #5f6368;
-  margin-bottom: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
 }
 
 .tool-select {
-  padding: 6px 10px;
-  border: 1px solid #dfe1e5;
-  border-radius: 4px;
-  font-size: 14px;
-  background: #fff;
+  padding: 6px var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--bg-surface);
   cursor: pointer;
-  min-width: 140px;
+  min-width: 130px;
+  font-family: var(--font-primary);
+  color: var(--text-primary);
 }
 
 .tool-select:focus {
   outline: none;
-  border-color: #1a73e8;
+  border-color: var(--color-primary);
 }
 
-.tools-apply-btn {
-  margin-top: 16px;
-  padding: 8px 24px;
-  background: #1a73e8;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.tools-apply-btn:hover {
-  background: #1557b0;
-}
-
+/* Main Content */
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: var(--space-lg) var(--space-md);
 }
 
 .content-layout {
   display: flex;
-  gap: 24px;
+  gap: var(--space-lg);
 }
 
 .results-section {
@@ -864,31 +874,33 @@ const countOptions = [
 }
 
 .sidebar-section {
-  width: 450px;
+  width: 360px;
   flex-shrink: 0;
+  padding-left: var(--space-lg);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .results-info {
-  color: #70757a;
-  font-size: 14px;
-  margin-bottom: 20px;
-  padding-left: 8px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-lg);
+  padding-left: var(--space-xs);
 }
 
 /* Web Results */
 .result-item {
-  padding: 12px 8px;
-}
-
-.result-link {
+  display: block;
+  padding: var(--space-md) var(--space-xs);
+  border-bottom: 1px solid var(--border-subtle);
   text-decoration: none;
+  transition: background var(--transition-fast);
 }
 
 .result-source {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .favicon {
@@ -898,33 +910,34 @@ const countOptions = [
 }
 
 .source-name {
-  color: #202124;
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .result-title {
-  color: #1a0dab;
-  font-size: 20px;
-  font-weight: normal;
-  margin: 0 0 4px 0;
+  color: var(--color-link);
+  font-size: 1.25rem;
+  font-weight: 400;
+  margin: 0 0 var(--space-xs) 0;
   line-height: 1.3;
 }
 
-.result-link:hover .result-title {
+.result-item:hover .result-title {
   text-decoration: underline;
+  color: var(--color-link-hover);
 }
 
 .result-url {
-  color: #202124;
-  font-size: 14px;
-  margin: 0 0 6px 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0 0 var(--space-xs) 0;
   word-break: break-all;
 }
 
 .result-snippet {
-  color: #4d5156;
-  font-size: 14px;
-  line-height: 1.58;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
   margin: 0;
   word-wrap: break-word;
 }
@@ -932,40 +945,42 @@ const countOptions = [
 /* Images Grid */
 .images-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-md);
 }
 
 .image-result {
   display: block;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  transition: transform 0.2s;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .image-result:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .image-result img {
   width: 100%;
-  height: 150px;
-  object-fit: cover;
+  height: auto;
+  display: block;
 }
 
 .image-title {
-  color: #202124;
-  font-size: 14px;
-  margin: 8px 0 0 0;
-  padding: 0 4px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  margin: var(--space-sm) 0 0 0;
+  padding: 0 var(--space-xs);
+  line-height: 1.4;
 }
 
 /* Videos Grid */
 .videos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-lg);
 }
 
 .video-result {
@@ -975,104 +990,101 @@ const countOptions = [
 
 .video-thumbnail {
   position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .video-thumbnail img {
   width: 100%;
-  height: 160px;
+  height: 150px;
   object-fit: cover;
-  border-radius: 12px;
 }
 
 .video-duration {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: var(--space-sm);
+  right: var(--space-sm);
   background: rgba(0,0,0,0.8);
   color: #fff;
-  font-size: 12px;
-  padding: 2px 4px;
-  border-radius: 4px;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
 }
 
 .video-title {
-  color: #202124;
-  font-size: 16px;
-  margin: 8px 0 4px 0;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  margin: var(--space-sm) 0 var(--space-xs) 0;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .video-source {
-  color: #70757a;
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
   margin: 0;
 }
 
 /* News Results */
 .news-result {
-  padding: 16px 8px;
-  border-bottom: 1px solid #ebebeb;
+  display: block;
+  padding: var(--space-md) var(--space-xs);
+  border-bottom: 1px solid var(--border-subtle);
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.news-result:hover {
+  background: var(--bg-elevated);
 }
 
 .news-source {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .news-date {
-  color: #70757a;
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }
 
-/* Knowledge Panel (Wikipedia) */
+/* Knowledge Panel */
 .knowledge-panel {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  overflow: hidden;
+  padding: var(--space-md) 0;
 }
 
 .wiki-image {
   width: 100%;
-  max-height: 300px;
-  object-fit: contain;
-  border-radius: 8px;
-  margin-bottom: 12px;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .wiki-title {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 500;
-  color: #202124;
-  margin: 0 0 4px 0;
-}
-
-.wiki-type {
-  font-size: 12px;
-  color: #70757a;
-  text-transform: capitalize;
-  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0;
 }
 
 .wiki-description {
-  font-size: 14px;
-  color: #4d5156;
-  line-height: 1.5;
-  margin: 0 0 12px 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm) 0;
 }
 
 .wiki-extract {
-  font-size: 14px;
-  color: #202124;
-  line-height: 1.58;
-  margin: 0 0 12px 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 var(--space-sm) 0;
 }
 
 .wiki-link {
-  font-size: 14px;
-  color: #1a73e8;
+  font-size: 0.875rem;
+  color: var(--color-link);
   text-decoration: none;
 }
 
@@ -1080,82 +1092,59 @@ const countOptions = [
   text-decoration: underline;
 }
 
-/* Wikipedia Infobox */
-.wiki-infobox {
-  margin: 16px 0;
-  border: 1px solid #a2a9b1;
-  background: #f8f9fa;
-  border-collapse: collapse;
-  font-size: 14px;
-  width: 100%;
-}
-
-.wiki-infobox :deep(th),
-.wiki-infobox :deep(td) {
-  padding: 8px;
-  border: 1px solid #a2a9b1;
-  vertical-align: top;
-}
-
-.wiki-infobox :deep(th) {
-  background: #eaecf0;
-  font-weight: 500;
-  text-align: left;
-  width: 40%;
-}
-
-.wiki-infobox :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
 /* Loading State */
 .loading-state {
-  padding: 20px 0;
+  padding: var(--space-lg) 0;
 }
 
 .skeleton {
-  padding: 12px 8px;
+  padding: var(--space-md) var(--space-xs);
 }
 
 .skeleton-title {
   height: 24px;
   width: 60%;
-  background: #f1f3f4;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .skeleton-url {
   height: 16px;
   width: 40%;
-  background: #f1f3f4;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .skeleton-text {
   height: 16px;
   width: 80%;
-  background: #f1f3f4;
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
 }
 
 /* Error & Empty States */
 .error-state, .no-results, .initial-state {
   text-align: center;
-  padding: 60px 20px;
-  color: #70757a;
+  padding: var(--space-2xl) var(--space-md);
+  color: var(--text-muted);
 }
 
 .retry-btn {
-  margin-top: 16px;
-  padding: 10px 20px;
-  background: #1a73e8;
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
   cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.retry-btn:hover {
+  background: var(--color-secondary);
 }
 
 /* Loading More */
@@ -1163,17 +1152,17 @@ const countOptions = [
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 30px 20px;
-  color: #5f6368;
-  font-size: 14px;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  color: var(--text-muted);
+  font-size: 0.875rem;
 }
 
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #dfe1e5;
-  border-top-color: #1a73e8;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1182,30 +1171,26 @@ const countOptions = [
   to { transform: rotate(360deg); }
 }
 
-/* Mobile Responsive Styles */
+/* Mobile Responsive */
 @media screen and (max-width: 1024px) {
   .sidebar-section {
     display: none;
-  }
-  
-  .content-layout {
-    flex-direction: column;
   }
 }
 
 @media screen and (max-width: 768px) {
   .header-content {
     flex-direction: column;
-    gap: 16px;
-    padding: 16px;
+    gap: var(--space-md);
+    padding: var(--space-md);
   }
   
   .logo-link {
-    align-self: flex-start;
+    align-self: center;
   }
   
   .logo-text {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   
   .search-bar-wrapper {
@@ -1218,20 +1203,20 @@ const countOptions = [
   }
   
   .tabs-inner {
-    padding: 0 12px;
+    padding: 0 var(--space-sm);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
   
   .tabs-left {
-    gap: 8px;
+    gap: 2px;
     flex-wrap: nowrap;
-    padding-bottom: 8px;
+    padding-bottom: var(--space-sm);
   }
   
   .tab {
-    padding: 10px 10px;
-    font-size: 13px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.8125rem;
     white-space: nowrap;
   }
   
@@ -1241,88 +1226,80 @@ const countOptions = [
   }
   
   .tools-dropdown {
-    padding: 12px;
+    padding: var(--space-sm);
   }
   
   .tools-grid {
-    gap: 12px;
+    gap: var(--space-sm);
   }
   
   .tool-group {
-    min-width: 120px;
+    min-width: 100px;
     flex: 1 1 45%;
   }
   
   .tool-select {
     min-width: 100%;
-    font-size: 13px;
-    padding: 8px;
+    font-size: 0.8125rem;
   }
   
   .main-content {
-    padding: 16px;
+    padding: var(--space-md);
   }
   
   .result-item {
-    padding: 16px 0;
+    padding: var(--space-md) 0;
   }
   
   .result-title {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   
   .result-url {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   
   .result-snippet {
-    font-size: 13px;
-    line-height: 1.5;
+    font-size: 0.875rem;
   }
   
-  /* Images Grid - Tablet */
   .images-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    gap: var(--space-sm);
   }
   
   .image-result img {
-    height: 120px;
+    height: auto;
   }
   
-  /* Videos Grid - Tablet */
   .videos-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    gap: var(--space-md);
   }
   
   .video-thumbnail img {
-    height: 140px;
+    height: 120px;
   }
   
   .video-title {
-    font-size: 14px;
-  }
-  
-  .results-info {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 }
 
 @media screen and (max-width: 480px) {
   .header-content {
-    padding: 12px;
-    gap: 12px;
+    padding: var(--space-sm);
+    gap: var(--space-sm);
   }
   
   .logo-text {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   
   .search-input-wrapper {
     height: 38px;
-    border-radius: 20px;
-    padding: 0 12px;
+    border-radius: 19px;
+    padding: 0 var(--space-sm);
   }
   
   .search-icon {
@@ -1331,25 +1308,20 @@ const countOptions = [
   }
   
   .search-input {
-    font-size: 14px;
-  }
-  
-  .clear-btn svg {
-    width: 16px;
-    height: 16px;
+    font-size: 0.875rem;
   }
   
   .tabs-inner {
-    padding: 0 8px;
+    padding: 0 var(--space-xs);
   }
   
   .tabs-left {
-    gap: 4px;
+    gap: 0;
   }
   
   .tab {
-    padding: 8px 8px;
-    font-size: 12px;
+    padding: 6px 8px;
+    font-size: 0.75rem;
   }
   
   .tab span {
@@ -1360,12 +1332,13 @@ const countOptions = [
     display: inline;
   }
   
-  .tools-dropdown {
-    padding: 10px;
+  .tab svg {
+    width: 16px;
+    height: 16px;
   }
   
-  .tools-title {
-    font-size: 13px;
+  .tools-dropdown {
+    padding: var(--space-sm);
   }
   
   .tool-group {
@@ -1373,109 +1346,80 @@ const countOptions = [
   }
   
   .main-content {
-    padding: 12px;
+    padding: var(--space-sm);
   }
   
   .results-info {
-    font-size: 12px;
-    margin-bottom: 12px;
+    font-size: 0.75rem;
+    margin-bottom: var(--space-sm);
   }
   
-  /* Web Results */
   .result-title {
-    font-size: 16px;
+    font-size: 1rem;
   }
   
   .result-url {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   
   .result-snippet {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   
-  /* Images Grid - Mobile */
   .images-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: var(--space-xs);
   }
   
   .image-result img {
-    height: 100px;
+    height: auto;
   }
   
   .image-title {
-    font-size: 12px;
+    font-size: 0.6875rem;
     padding: 0 2px;
   }
   
-  /* Videos Grid - Mobile */
   .videos-grid {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: var(--space-sm);
   }
   
   .video-thumbnail img {
-    height: 160px;
+    height: 140px;
   }
   
   .video-title {
-    font-size: 14px;
+    font-size: 0.8125rem;
   }
   
-  .video-source {
-    font-size: 11px;
-  }
-  
-  /* News Results */
   .news-result {
-    padding: 12px 0;
-  }
-  
-  .news-source {
-    flex-wrap: wrap;
+    padding: var(--space-sm) 0;
   }
   
   .result-title {
-    font-size: 16px;
+    font-size: 1rem;
   }
   
-  /* Loading & Error States */
   .error-state, .no-results, .initial-state {
-    padding: 40px 16px;
+    padding: var(--space-xl) var(--space-sm);
   }
   
   .retry-btn {
-    padding: 8px 16px;
-    font-size: 14px;
+    padding: var(--space-xs) var(--space-md);
+    font-size: 0.8125rem;
   }
   
-  /* Suggestions dropdown mobile */
   .suggestions-dropdown {
-    border-radius: 0 0 20px 20px;
+    border-radius: 0 0 19px 19px;
   }
   
   .suggestion-item {
-    padding: 10px 12px;
+    padding: var(--space-xs) var(--space-sm);
   }
   
   .suggestion-item span {
-    font-size: 14px;
-  }
-  
-  /* Skeleton loading */
-  .skeleton-title {
-    width: 70%;
-  }
-  
-  .skeleton-url {
-    width: 50%;
-  }
-  
-  .skeleton-text {
-    width: 90%;
+    font-size: 0.875rem;
   }
 }
 </style>
-
-
