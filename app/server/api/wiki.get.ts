@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const headers = {
-      'User-Agent': 'PersonalSearch/1.0 (https://github.com/Mostlime12195/personal-search; contact@example.com)'
+      'User-Agent': 'PersonalSearch/1.0 (https://github.com/Mostlime12195/personal-search; mostlime@outlook.com)'
     }
     
     // First get the search to find the best matching page

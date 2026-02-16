@@ -1,23 +1,45 @@
-<script setup>
+<script setup lang="ts">
+import { Icon } from '@iconify/vue'
+import CustomSelect from '~/components/CustomSelect.vue'
+import { 
+  countries, 
+  languages, 
+  safesearchOptions, 
+  freshnessOptions, 
+  countOptions 
+} from '~/composables/useConstants'
+
 const route = useRoute()
 const router = useRouter()
 
-// Get search query and type from route
-const searchQuery = computed(() => route.query.q || '')
-const searchType = computed(() => route.query.type || 'web')
+// Helper to get string from query param
+const getQueryString = (param: string | string[] | undefined | null, fallback: string): string => {
+  if (!param) return fallback
+  if (Array.isArray(param)) return param[0] || fallback
+  return param
+}
 
-// Search parameters
+// Get search query and type from route
+const searchQuery = computed(() => getQueryString(route.query.q, ''))
+const searchType = computed(() => getQueryString(route.query.type, 'web'))
+
+// Get default settings from cookies
+const defaultCountryCookie = useCookie('defaultCountry', { default: () => 'us' })
+const defaultLanguageCookie = useCookie('defaultLanguage', { default: () => 'en' })
+const defaultSafesearchCookie = useCookie('defaultSafesearch', { default: () => 'moderate' })
+
+// Search parameters - use URL params first, then fall back to cookies/defaults
 const searchParams = ref({
-  country: route.query.country || 'us',
-  search_lang: route.query.search_lang || 'en',
-  safesearch: route.query.safesearch || 'moderate',
-  freshness: route.query.freshness || '',
-  count: route.query.count || '20'
+  country: getQueryString(route.query.country, defaultCountryCookie.value || 'us'),
+  search_lang: getQueryString(route.query.search_lang, defaultLanguageCookie.value || 'en'),
+  safesearch: getQueryString(route.query.safesearch, defaultSafesearchCookie.value || 'moderate'),
+  freshness: getQueryString(route.query.freshness, ''),
+  count: getQueryString(route.query.count, '20')
 })
 
 // Wikipedia language mapping
 const wikiLang = computed(() => {
-  const langMap = {
+  const langMap: Record<string, string> = {
     'en': 'en',
     'es': 'es',
     'fr': 'fr',
@@ -30,20 +52,55 @@ const wikiLang = computed(() => {
   return langMap[searchParams.value.search_lang] || 'en'
 })
 
+// Helper to build query params
+const buildQueryParams = (extraParams: Record<string, any> = {}) => {
+  const params: Record<string, string> = {
+    q: searchQuery.value,
+    ...extraParams
+  }
+  
+  if (searchParams.value.country && searchParams.value.country !== 'us') {
+    params.country = searchParams.value.country
+  }
+  if (searchParams.value.search_lang && searchParams.value.search_lang !== 'en') {
+    params.search_lang = searchParams.value.search_lang
+  }
+  if (searchParams.value.safesearch && searchParams.value.safesearch !== 'moderate') {
+    params.safesearch = searchParams.value.safesearch
+  }
+  if (searchParams.value.freshness) {
+    params.freshness = searchParams.value.freshness
+  }
+  params.count = searchParams.value.count
+  
+  return params
+}
+
+// Helper to parse results from API response
+const parseResults = (data: any, type: string) => {
+  if (!data) return []
+  
+  switch (type) {
+    case 'web':
+      return data?.web?.results || data?.result?.results || data?.results || []
+    case 'images':
+      return data?.images?.results || data?.results || []
+    case 'videos':
+      return data?.videos?.results || data?.results || []
+    case 'news':
+      return data?.news?.results || data?.results || []
+    default:
+      return []
+  }
+}
+
 // Fetch data based on search type
 const { data, pending, error, refresh } = await useFetch(() => {
   const type = searchType.value
   const endpoint = type === 'web' ? '/api/search' : `/api/${type}`
   return endpoint
 }, {
-  query: computed(() => ({
-    q: searchQuery.value,
-    ...(searchParams.value.country && searchParams.value.country !== 'us' ? { country: searchParams.value.country } : {}),
-    ...(searchParams.value.search_lang && searchParams.value.search_lang !== 'en' ? { search_lang: searchParams.value.search_lang } : {}),
-    ...(searchParams.value.safesearch && searchParams.value.safesearch !== 'moderate' ? { safesearch: searchParams.value.safesearch } : {}),
-    ...(searchParams.value.freshness ? { freshness: searchParams.value.freshness } : {}),
-    count: searchParams.value.count
-  })),
+  query: computed(() => buildQueryParams()),
   watch: [searchQuery, searchType, searchParams],
   lazy: true,
   server: false
@@ -51,9 +108,10 @@ const { data, pending, error, refresh } = await useFetch(() => {
 
 // Wikipedia details
 const { data: wikiData } = await useFetch(() => {
-  if (!searchQuery.value.trim()) return null
+  if (!searchQuery.value.trim()) { return '/api/wiki' }
   return `/api/wiki?q=${encodeURIComponent(searchQuery.value)}&lang=${wikiLang.value}`
 }, {
+  query: computed(() => searchQuery.value.trim() ? { q: searchQuery.value, lang: wikiLang.value } : {}),
   watch: [searchQuery, wikiLang],
   lazy: true,
   server: false
@@ -62,7 +120,7 @@ const { data: wikiData } = await useFetch(() => {
 const wikipediaResult = computed(() => wikiData.value)
 
 // Compute results
-const allResults = ref([])
+const allResults = ref<any[]>([])
 const currentOffset = ref(0)
 const isLoadingMore = ref(false)
 const hasMoreResults = ref(true)
@@ -84,27 +142,10 @@ const loadMoreResults = async () => {
     const endpoint = type === 'web' ? '/api/search' : `/api/${type}`
     
     const newData = await $fetch(endpoint, {
-      query: {
-        q: searchQuery.value,
-        offset: nextOffset,
-        ...(searchParams.value.country && searchParams.value.country !== 'us' ? { country: searchParams.value.country } : {}),
-        ...(searchParams.value.search_lang && searchParams.value.search_lang !== 'en' ? { search_lang: searchParams.value.search_lang } : {}),
-        ...(searchParams.value.safesearch && searchParams.value.safesearch !== 'moderate' ? { safesearch: searchParams.value.safesearch } : {}),
-        ...(searchParams.value.freshness ? { freshness: searchParams.value.freshness } : {}),
-        count: searchParams.value.count
-      }
+      query: buildQueryParams({ offset: nextOffset })
     })
     
-    let newResults = []
-    if (type === 'web') {
-      newResults = newData?.web?.results || newData?.result?.results || newData?.results || []
-    } else if (type === 'images') {
-      newResults = newData?.images?.results || newData?.results || []
-    } else if (type === 'videos') {
-      newResults = newData?.videos?.results || newData?.results || []
-    } else if (type === 'news') {
-      newResults = newData?.news?.results || newData?.results || []
-    }
+    const newResults = parseResults(newData, type)
     
     if (newResults.length > 0) {
       allResults.value = [...allResults.value, ...newResults]
@@ -129,20 +170,7 @@ watch([searchQuery, searchType], () => {
 
 // Update results when initial data changes
 watch(data, (newData) => {
-  if (newData) {
-    const type = searchType.value
-    if (type === 'web') {
-      allResults.value = newData?.web?.results || newData?.result?.results || newData?.results || []
-    } else if (type === 'images') {
-      allResults.value = newData?.images?.results || newData?.results || []
-    } else if (type === 'videos') {
-      allResults.value = newData?.videos?.results || newData?.results || []
-    } else if (type === 'news') {
-      allResults.value = newData?.news?.results || newData?.results || []
-    }
-  } else {
-    allResults.value = []
-  }
+  allResults.value = parseResults(newData, searchType.value)
   currentOffset.value = 0
   hasMoreResults.value = true
 })
@@ -172,33 +200,17 @@ onUnmounted(() => {
 })
 
 // Navigation
-const setSearchType = (type) => {
+const setSearchType = (type: string) => {
   router.push({
     path: '/search',
-    query: { 
-      q: searchQuery.value, 
-      type,
-      ...(searchParams.value.country && searchParams.value.country !== 'us' ? { country: searchParams.value.country } : {}),
-      ...(searchParams.value.search_lang && searchParams.value.search_lang !== 'en' ? { search_lang: searchParams.value.search_lang } : {}),
-      ...(searchParams.value.safesearch && searchParams.value.safesearch !== 'moderate' ? { safesearch: searchParams.value.safesearch } : {}),
-      ...(searchParams.value.freshness ? { freshness: searchParams.value.freshness } : {}),
-      ...(searchParams.value.count && searchParams.value.count !== '20' ? { count: searchParams.value.count } : {})
-    }
+    query: buildQueryParams({ type })
   })
 }
 
 const applyParams = () => {
   router.push({
     path: '/search',
-    query: { 
-      q: searchQuery.value, 
-      type: searchType.value,
-      ...(searchParams.value.country && searchParams.value.country !== 'us' ? { country: searchParams.value.country } : {}),
-      ...(searchParams.value.search_lang && searchParams.value.search_lang !== 'en' ? { search_lang: searchParams.value.search_lang } : {}),
-      ...(searchParams.value.safesearch && searchParams.value.safesearch !== 'moderate' ? { safesearch: searchParams.value.safesearch } : {}),
-      ...(searchParams.value.freshness ? { freshness: searchParams.value.freshness } : {}),
-      ...(searchParams.value.count && searchParams.value.count !== '20' ? { count: searchParams.value.count } : {})
-    }
+    query: buildQueryParams({ type: searchType.value })
   })
 }
 
@@ -208,11 +220,11 @@ const showSettings = ref(false)
 // Local search input
 const localQuery = ref('')
 const showSuggestions = ref(false)
-const suggestions = ref([])
+const suggestions = ref<string[]>([])
 
 // Set local query from route
 watch(() => route.query.q, (newVal) => {
-  if (newVal) localQuery.value = newVal
+  if (newVal) localQuery.value = getQueryString(newVal, '')
 }, { immediate: true })
 
 const handleInput = () => {
@@ -238,7 +250,7 @@ const fetchSuggestions = async () => {
   }
 }
 
-const selectSuggestion = (suggestion) => {
+const selectSuggestion = (suggestion: string) => {
   localQuery.value = suggestion
   showSuggestions.value = false
   handleSearch()
@@ -257,47 +269,19 @@ const closeSuggestions = () => {
   }, 200)
 }
 
-// Parameter options
-const countries = [
-  { value: 'us', label: 'United States' },
-  { value: 'gb', label: 'United Kingdom' },
-  { value: 'ca', label: 'Canada' },
-  { value: 'au', label: 'Australia' },
-  { value: 'de', label: 'Germany' },
-  { value: 'fr', label: 'France' },
-  { value: 'es', label: 'Spain' },
-  { value: 'jp', label: 'Japan' }
-]
+// Handle escape key to close suggestions and settings
+const handleEscape = () => {
+  showSuggestions.value = false
+  showSettings.value = false
+}
 
-const languages = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'it', label: 'Italian' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'ru', label: 'Russian' },
-  { value: 'ja', label: 'Japanese' }
-]
+onMounted(() => {
+  window.addEventListener('keyboard:escape', handleEscape)
+})
 
-const safesearchOptions = [
-  { value: 'off', label: 'Off' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'strict', label: 'Strict' }
-]
-
-const freshnessOptions = [
-  { value: '', label: 'Any time' },
-  { value: 'pd', label: 'Past 24 hours' },
-  { value: 'pw', label: 'Past week' },
-  { value: 'pm', label: 'Past month' },
-  { value: 'py', label: 'Past year' }
-]
-
-const countOptions = [
-  { value: '10', label: '10 results' },
-  { value: '20', label: '20 results' }
-]
+onUnmounted(() => {
+  window.removeEventListener('keyboard:escape', handleEscape)
+})
 </script>
 
 <template>
@@ -354,6 +338,11 @@ const countOptions = [
             </ul>
           </div>
         </div>
+        
+        <!-- Settings Button - Right edge of header -->
+        <NuxtLink to="/settings" class="settings-btn-header" aria-label="Settings">
+          <Icon icon="material-symbols:settings" />
+        </NuxtLink>
       </div>
     </div>
     
@@ -414,33 +403,43 @@ const countOptions = [
           <div class="tools-grid">
             <div class="tool-group">
               <label class="tool-label">Country</label>
-              <select v-model="searchParams.country" @change="applyParams" class="tool-select">
-                <option v-for="c in countries" :key="c.value" :value="c.value">{{ c.label }}</option>
-              </select>
+              <CustomSelect 
+                v-model="searchParams.country" 
+                :options="countries"
+                @change="applyParams"
+              />
             </div>
             <div class="tool-group">
               <label class="tool-label">Language</label>
-              <select v-model="searchParams.search_lang" @change="applyParams" class="tool-select">
-                <option v-for="l in languages" :key="l.value" :value="l.value">{{ l.label }}</option>
-              </select>
+              <CustomSelect 
+                v-model="searchParams.search_lang" 
+                :options="languages"
+                @change="applyParams"
+              />
             </div>
             <div class="tool-group">
               <label class="tool-label">SafeSearch</label>
-              <select v-model="searchParams.safesearch" @change="applyParams" class="tool-select">
-                <option v-for="s in safesearchOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
-              </select>
+              <CustomSelect 
+                v-model="searchParams.safesearch" 
+                :options="safesearchOptions"
+                @change="applyParams"
+              />
             </div>
             <div class="tool-group">
               <label class="tool-label">Time</label>
-              <select v-model="searchParams.freshness" @change="applyParams" class="tool-select">
-                <option v-for="f in freshnessOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
-              </select>
+              <CustomSelect 
+                v-model="searchParams.freshness" 
+                :options="freshnessOptions"
+                @change="applyParams"
+              />
             </div>
             <div class="tool-group">
               <label class="tool-label">Results</label>
-              <select v-model="searchParams.count" @change="applyParams" class="tool-select">
-                <option v-for="c in countOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
-              </select>
+              <CustomSelect 
+                v-model="searchParams.count" 
+                :options="countOptions"
+                @change="applyParams"
+              />
             </div>
           </div>
         </div>
@@ -604,7 +603,8 @@ const countOptions = [
   padding: var(--space-md) var(--space-md) var(--space-sm);
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--space-md);
+  position: relative;
 }
 
 .logo-link {
@@ -617,6 +617,37 @@ const countOptions = [
   color: var(--color-primary);
   font-family: var(--font-primary);
   font-weight: 400;
+}
+
+/* Settings Button - Header */
+.settings-btn-header {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+  margin-right: var(--space-xs);
+}
+
+.settings-btn-header:hover {
+  background: var(--bg-elevated);
+  color: var(--color-primary);
+}
+
+.settings-btn-header :deep(svg) {
+  width: 22px;
+  height: 22px;
 }
 
 .search-bar-wrapper {
@@ -839,21 +870,75 @@ const countOptions = [
   margin-bottom: var(--space-xs);
 }
 
+.tool-select-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
 .tool-select {
-  padding: 6px var(--space-sm);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  padding: 10px 36px 10px 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
   font-size: 0.875rem;
   background: var(--bg-surface);
   cursor: pointer;
   min-width: 130px;
   font-family: var(--font-primary);
   color: var(--text-primary);
+  transition: all 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.tool-select:hover {
+  border-color: var(--color-secondary);
+  background: var(--bg-elevated);
 }
 
 .tool-select:focus {
   outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(92, 34, 12, 0.15);
+}
+
+/* Custom arrow icon */
+.tool-select-arrow {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.tool-select-wrapper:hover .tool-select-arrow {
+  color: var(--color-primary);
+  transform: translateY(1px);
+}
+
+.tool-select:focus + .tool-select-arrow {
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+/* Dark mode tool select */
+[data-theme="dark"] .tool-select {
+  background: var(--bg-elevated);
+}
+
+[data-theme="dark"] .tool-select-arrow {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .tool-select:focus + .tool-select-arrow {
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .tool-select:focus {
+  box-shadow: 0 0 0 4px rgba(232, 220, 213, 0.15);
 }
 
 /* Main Content */
@@ -1183,14 +1268,29 @@ const countOptions = [
     flex-direction: column;
     gap: var(--space-md);
     padding: var(--space-md);
+    padding-right: 50px;
+    align-items: stretch;
   }
   
   .logo-link {
-    align-self: center;
+    align-self: flex-start;
   }
   
   .logo-text {
     font-size: 1.25rem;
+  }
+  
+  .settings-btn-header {
+    right: var(--space-sm);
+    top: var(--space-md);
+    transform: none;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .settings-btn-header svg {
+    width: 18px;
+    height: 18px;
   }
   
   .search-bar-wrapper {

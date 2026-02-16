@@ -1,4 +1,6 @@
 <script setup>
+import { Icon } from '@iconify/vue'
+
 const router = useRouter()
 const searchQuery = ref('')
 const searchType = ref('web')
@@ -62,10 +64,29 @@ const closeSuggestions = () => {
     showSuggestions.value = false
   }, 200)
 }
+
+// Handle escape key to close suggestions
+const handleEscape = () => {
+  showSuggestions.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('keyboard:escape', handleEscape)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keyboard:escape', handleEscape)
+  if (suggestionTimeout) clearTimeout(suggestionTimeout)
+})
 </script>
 
 <template>
   <div class="home-page">
+    <!-- Settings Button - Top Right -->
+    <NuxtLink to="/settings" class="settings-btn" aria-label="Settings">
+      <Icon icon="material-symbols:settings" />
+    </NuxtLink>
+    
     <div class="search-container">
       <h1 class="logo">Search</h1>
       
@@ -164,6 +185,65 @@ const closeSuggestions = () => {
   justify-content: flex-start;
   padding-top: 15vh;
   padding-bottom: var(--space-xl);
+  position: relative;
+}
+
+/* Settings Button */
+.settings-btn {
+  position: absolute;
+  top: var(--space-lg);
+  right: var(--space-lg);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  z-index: 10;
+}
+
+.settings-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--color-primary);
+}
+
+.settings-btn :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+
+/* Mobile Responsive for Settings Button */
+@media screen and (max-width: 768px) {
+  .settings-btn {
+    top: var(--space-md);
+    right: var(--space-md);
+    width: 40px;
+    height: 40px;
+  }
+  
+  .settings-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .settings-btn {
+    top: var(--space-sm);
+    right: var(--space-sm);
+    width: 36px;
+    height: 36px;
+  }
+  
+  .settings-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .search-container {
